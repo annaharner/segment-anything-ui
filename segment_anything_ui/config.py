@@ -34,6 +34,7 @@ class ProgressBar:
 @dataclasses.dataclass
 class KeyBindings:
     ADD_POINT: Keymap = Keymap(Qt.Key.Key_W, "W")
+    DELETE_POINT: Keymap = Keymap(Qt.Key.Key_A, "A")
     ADD_BOX: Keymap = Keymap(Qt.Key.Key_Q, "Q")
     ANNOTATE_ALL: Keymap = Keymap(Qt.Key.Key_Return, "Enter")
     MANUAL_POLYGON: Keymap = Keymap(Qt.Key.Key_R, "R")
@@ -49,6 +50,9 @@ class KeyBindings:
     SAVE_MASK: Keymap = Keymap("Ctrl+S", "Ctrl+S")
     PRECOMPUTE: Keymap = Keymap(Qt.Key.Key_P, "P")
     ZOOM_RECTANGLE: Keymap = Keymap(Qt.Key.Key_E, "E")
+
+    MOVE_POINTS_NEXT: Keymap = Keymap(Qt.Key.Key_N, "N")  # Add this
+    MOVE_POINTS_PREV: Keymap = Keymap(Qt.Key.Key_B, "B")  # Add this
 
 
 @dataclasses.dataclass

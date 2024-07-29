@@ -253,6 +253,7 @@ class Annotator:
                                         0.8, last_mask, 0.5, 0)
         self.parent.update(crop_image(visualization, self.zoomed_bounding_box))
 
+
     def _visualize_mask(self) -> tuple:
         mask_argmax = self.make_instance_mask()
         visualization = np.zeros_like(self.image)
@@ -314,6 +315,21 @@ class Annotator:
             self.MAX_MASKS += 10
             self.cmap = get_cmap(self.MAX_MASKS)
 
+    #Added
+    def move_points_to_next_file(self):
+       # logic to move points to the next file
+        self.save_current_annotations()
+        self.load_next_file()
+        self.apply_annotations()
+
+    # Added
+    def move_points_to_previous_file(self):
+        # logic to move points to the previous file
+        self.save_current_annotations()
+        self.load_previous_file()
+        self.apply_annotations()
+
+
     def clear_last_masks(self):
         self.last_mask = None
         self.partial_mask = None
@@ -324,3 +340,4 @@ class Annotator:
         self.visualization = None
         self.masks = MasksAnnotation()
         self.partial_mask = None
+

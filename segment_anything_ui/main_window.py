@@ -15,6 +15,7 @@ from segment_anything_ui.draw_label import DrawLabel
 from segment_anything_ui.image_pixmap import ImagePixmap
 from segment_anything_ui.modeling.efficientvit.sam_model_zoo import create_sam_model
 from segment_anything_ui.settings_layout import SettingsLayout
+from settings_layout import FilesHolder
 
 
 class SegmentAnythingUI(QWidget):
@@ -28,7 +29,7 @@ class SegmentAnythingUI(QWidget):
         # self.setGeometry(100, 100, 800, 600)
         self.layout = QGridLayout(self)
         self.image_label = DrawLabel(self)
-        self.settings = SettingsLayout(self, config=self.config)
+        self.settings = SettingsLayout(self, config=self.config, image_label=self.image_label)
         self.info_label = QLabel("Information about running process.")
         self.sam = self.init_sam()
         self.annotator = Annotator(sam=self.sam, parent=self)
@@ -37,6 +38,8 @@ class SegmentAnythingUI(QWidget):
         self.layout.addWidget(self.image_label, 0, 1, 1, 1, Qt.AlignCenter)
         self.layout.addWidget(self.settings, 0, 3, 1, 1, Qt.AlignCenter)
         self.layout.addWidget(self.info_label, 1, 1, Qt.AlignBottom)
+
+        self.class_layout_instance = FilesHolder()
 
         self.set_image(np.zeros((self.config.window_size[1], self.config.window_size[0], 3), dtype=np.uint8))
         self.show()
@@ -52,6 +55,8 @@ class SegmentAnythingUI(QWidget):
         pixmap.set_image(image)
         print("Updating image")
         self.image_label.setPixmap(pixmap)
+        self.image_label
+        # self.image_label.load_next_image()
 
     def init_sam(self):
         try:
@@ -74,8 +79,11 @@ class SegmentAnythingUI(QWidget):
     def get_mask(self):
         return self.annotator.make_instance_mask()
 
+
     def get_labels(self):
         return self.annotator.make_labels()
+    
+
 
 
 if __name__ == '__main__':
@@ -83,3 +91,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     ex = SegmentAnythingUI(Config())
     sys.exit(app.exec())
+

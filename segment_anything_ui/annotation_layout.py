@@ -8,7 +8,6 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QLineEd
 from segment_anything_ui.draw_label import PaintType
 from segment_anything_ui.annotator import AutomaticMaskGeneratorSettings, CustomForm, MasksAnnotation
 
-
 class MergeState(enum.Enum):
     PICKING = enum.auto()
     MERGING = enum.auto()
@@ -25,6 +24,7 @@ class AnnotationLayout(QWidget):
         labels = self._load_labels(config)
         self.layout.setAlignment(Qt.AlignTop)
         self.add_point = QPushButton(f"Add Point [ {config.key_mapping.ADD_POINT.name} ]")
+        self.delete_point = QPushButton(f"Delete Point [ {config.key_mapping.DELETE_POINT.name} ]")
         self.add_box = QPushButton(f"Add Box [ {config.key_mapping.ADD_BOX.name} ]")
         self.annotate_all = QPushButton(f"Annotate All [ {config.key_mapping.ANNOTATE_ALL.name} ]")
         self.manual_polygon = QPushButton(f"Manual Polygon [ {config.key_mapping.MANUAL_POLYGON.name} ]")
@@ -44,6 +44,7 @@ class AnnotationLayout(QWidget):
         self.remove_hidden_masks_line = QLineEdit("0.5")
         self.save_annotation.setShortcut(config.key_mapping.SAVE_ANNOTATION.key)
         self.add_point.setShortcut(config.key_mapping.ADD_POINT.key)
+        self.add_point.setShortcut(config.key_mapping.DELETE_POINT.key)
         self.add_box.setShortcut(config.key_mapping.ADD_BOX.key)
         self.annotate_all.setShortcut(config.key_mapping.ANNOTATE_ALL.key)
         self.cancel_annotation.setShortcut(config.key_mapping.CANCEL_ANNOTATION.key)
@@ -55,6 +56,7 @@ class AnnotationLayout(QWidget):
         self.annotation_settings = CustomForm(self, AutomaticMaskGeneratorSettings())
         for w in [
                 self.add_point,
+                self.delete_point,
                 self.add_box,
                 self.annotate_all,
                 self.pick_mask,
@@ -74,6 +76,7 @@ class AnnotationLayout(QWidget):
             ]:
             self.layout.addWidget(w)
         self.add_point.clicked.connect(self.on_add_point)
+        self.delete_point.clicked.connect(self.on_delete_point)
         self.add_box.clicked.connect(self.on_add_box)
         self.annotate_all.clicked.connect(self.on_annotate_all)
         self.cancel_annotation.clicked.connect(self.on_cancel_annotation)
@@ -156,6 +159,10 @@ class AnnotationLayout(QWidget):
     def on_add_point(self):
         self.parent().info_label.setText("Adding point annotation!")
         self.parent().image_label.change_paint_type(PaintType.POINT)
+    
+    def on_delete_point(self):
+        self.parent().info_label.setText("Deleting point annotation!")
+        self.parent().image_label.change_paint_type(PaintType.DELETE_POINT)
 
     def on_add_box(self):
         self.parent().info_label.setText("Adding box annotation!")
@@ -176,7 +183,7 @@ class AnnotationLayout(QWidget):
             self.zoom_flag = True
 
     def on_annotate_all(self):
-        self.parent().info_label.setText("Annotating all. This make take some time.")
+        self.parent().info_label.setText("Annotating all. This may take some time.")
         self.parent().annotator.predict_all(self.annotation_settings.get_values())
         self.parent().update(self.parent().annotator.merge_image_visualization())
         self.parent().info_label.setText("Annotate all finished.")
@@ -193,4 +200,3 @@ class AnnotationLayout(QWidget):
         self.parent().annotator.save_mask(label=self.label_picker.currentItem().text())
         self.parent().update(self.parent().annotator.merge_image_visualization())
         self.parent().image_label.clear()
-

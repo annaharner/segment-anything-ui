@@ -10,6 +10,9 @@ from PySide6.QtGui import QPainter, QPen
 from segment_anything_ui.config import Config
 from segment_anything_ui.utils.shapes import BoundingBox, Polygon
 
+from settings_layout import FilesHolder, SettingsLayout
+from image_pixmap import ImagePixmap
+
 
 class PaintType(Enum):
     POINT = 0
@@ -18,6 +21,7 @@ class PaintType(Enum):
     POLYGON = 3
     MASK_PICKER = 4
     ZOOM_PICKER = 5
+    DELETE_POINT = 6
 
 
 class MaskIdPicker:
@@ -123,7 +127,17 @@ class DrawLabel(QtWidgets.QLabel):
                 self._move_update(point, None)
             else:
                 pass
+
+        if self._paint_type == PaintType.DELETE_POINT:
+            point = ev.pos()
+            if ev.buttons() == QtCore.Qt.LeftButton:
+                self._move_update(None, point)
+            elif ev.buttons() == QtCore.Qt.RightButton:
+                self._move_update(point, None)
+            else:
+                pass
         self.update()
+
 
     def _move_update(self, temporary_point_negative, temporary_point_positive):
         annotations = self.get_annotations(temporary_point_positive, temporary_point_negative)
@@ -184,7 +198,7 @@ class DrawLabel(QtWidgets.QLabel):
             self.parent().annotator.masks.mask_id = mask_id
             self.parent().annotator.last_mask = local_mask
             self.parent().annotator.visualize_last_mask(label)
-        if self._paint_type == PaintType.POINT:
+        if self._paint_type == PaintType.POINT or self._paint_type == PaintType.DELETE_POINT:
             point = ev.pos()
             if ev.button() == QtCore.Qt.LeftButton:
                 self._move_update(None, point)
@@ -215,20 +229,36 @@ class DrawLabel(QtWidgets.QLabel):
             temporary_point_negative: PySide6.QtCore.QPoint | None = None
         ):
         sx, sy = self._get_scale()
+
         positive_points = [(
             p.x() * sx,
             p.y() * sy) for p in self.positive_points]
         negative_points = [(
             p.x() * sx,
             p.y() * sy) for p in self.negative_points]
-        
-        if temporary_point_positive:
-            positive_points += [(temporary_point_positive.x() * sx, temporary_point_positive.y() * sy)]
-        if temporary_point_negative:
-            negative_points += [(temporary_point_negative.x() * sx, temporary_point_negative.y() * sy)]
-        
         positive_points = np.array(positive_points).reshape(-1, 2)
         negative_points = np.array(negative_points).reshape(-1, 2)
+        
+        # Add or remove temporary points
+        # To remove a point, check if the checkbox is set
+        # Find the clostest point to the temporary point and remove it
+        if self._paint_type == PaintType.DELETE_POINT:
+            
+            if temporary_point_positive and positive_points.shape[0] > 0:
+                tmp_pnt = np.array([temporary_point_positive.x() * sx, temporary_point_positive.y() * sy])
+                closest_index = np.argmin(np.linalg.norm(positive_points - tmp_pnt, axis=1))
+                print(f"Closest index: {closest_index}")
+                self.positive_points.pop(closest_index)
+                positive_points = np.delete(positive_points, closest_index, axis=0)
+                self.parent().info_label.setText("Deleting positive point annotation!")
+            if temporary_point_negative and negative_points.shape[0] > 0:
+                tmp_pnt = np.array([temporary_point_negative.x() * sx, temporary_point_negative.y() * sy])
+                closest_index = np.argmin(np.linalg.norm(negative_points - tmp_pnt, axis=1))
+                print(f"Closest index: {closest_index}")
+                self.negative_points.pop(closest_index)
+                negative_points = np.delete(negative_points, closest_index, axis=0)
+                self.parent().info_label.setText("Deleting negative point annotation!")
+
         labels = np.array([1, ] * len(positive_points) + [0, ] * len(negative_points))
         print(f"Positive points: {positive_points}")
         print(f"Negative points: {negative_points}")
@@ -238,6 +268,7 @@ class DrawLabel(QtWidgets.QLabel):
             "labels": labels,
             "bounding_boxes": self.bounding_box.scale(sx, sy).to_numpy() if self.bounding_box else None
         }
+    
 
     def clear(self):
         self.positive_points = []
