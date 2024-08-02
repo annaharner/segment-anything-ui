@@ -104,7 +104,7 @@ class AnnotationLayout(QWidget):
 
     @staticmethod
     def _load_labels(config):
-        if not os.path.exists(config.label_file):
+        if not os.path.exists(config.label_file):  
             return ["default"]
         with open(config.label_file, "r") as f:
             labels = json.load(f)

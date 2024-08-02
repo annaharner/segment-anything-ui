@@ -92,3 +92,6 @@ if __name__ == '__main__':
     ex = SegmentAnythingUI(Config())
     sys.exit(app.exec())
 
+
+
+

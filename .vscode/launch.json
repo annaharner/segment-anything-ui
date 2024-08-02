@@ -23,7 +23,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/segment_anything_ui"
             }
         }
     ]

@@ -79,6 +79,10 @@ class SettingsLayout(QWidget):
         self.show_visualization.clicked.connect(self.on_show_visualization)
         self.show_text = QCheckBox("Show Text")
         self.show_text.clicked.connect(self.on_show_text)
+        self.labels_text_label = QLabel(self, text="Labels Text")
+        self.label_text_field = QLineEdit(self)
+        self.label_text_field.setPlaceholderText("Comma separated image labels")
+        self.text_field_label = QLabel(self, text="Comma Separated Tags")
         self.tag_text_field = QLineEdit(self)
         self.tag_text_field.setPlaceholderText("Comma separated image tags")
         self.layout.addWidget(self.open_files)
@@ -89,7 +93,10 @@ class SettingsLayout(QWidget):
         self.layout.addWidget(self.save_mask)
         self.layout.addWidget(self.delete_existing_annotation)
         self.layout.addWidget(self.Save_Seg_Stack)
+        self.layout.addWidget(self.labels_text_label)
         self.layout.addWidget(self.show_text)
+        self.layout.addWidget(self.label_text_field)
+        self.layout.addWidget(self.text_field_label)
         self.layout.addWidget(self.tag_text_field)
         self.layout.addWidget(self.checkpoint_path_label)
         self.layout.addWidget(self.checkpoint_path)
@@ -121,23 +128,13 @@ class SettingsLayout(QWidget):
             os.remove(labels_path)
             print(f"Deleted labels file: {labels_path}")
 
-    # def on_delete_existing_annotation(self):
-    #     path = os.path.split(self.actual_file)[0]
-    #     basename = os.path.splitext(os.path.basename(self.actual_file))[0]
-    #     mask_path = os.path.join(path, basename + self.MASK_EXTENSION)
-    #     labels_path = os.path.join(path, basename + self.LABELS_EXTENSION)
-    #     if os.path.exists(mask_path):
-    #         os.remove(mask_path)
-    #     if os.path.exists(labels_path):
-    #         os.remove(labels_path)
-
     def is_show_text(self):
         return self.show_text.isChecked()
 
     def on_show_text(self): 
         self.parent().update(self.parent().annotator.merge_image_visualization())
 
-    # Save the promp poitns for teh current annotation
+    # Save the promp points for the current annotation
     def on_save_anno_prompt(self):
         if self.apply_anno_to_next.isChecked():
             self.pos_pnts = self.image_label.positive_points
@@ -170,9 +167,9 @@ class SettingsLayout(QWidget):
     def on_next_file(self):
         if self.save_auto_annos.isChecked():
             self.on_save_annos_masks()
-
         file = self.files.get_next()
         self._load_image(file)
+        self.parent().setWindowTitle("Segment Anything UI - " + file)
         # Check if annotations should be propagated to the next image
         if self.apply_anno_to_next.isChecked():
             self.on_apply_anno_to_next()
@@ -180,14 +177,13 @@ class SettingsLayout(QWidget):
     def on_previous_file(self):
         file = self.files.get_previous()
         self._load_image(file)
-        # Check if annotations should be propagated to the next image
+        # Check if annotations should be propagated to the pervious image
         if self.apply_anno_to_next.isChecked():
             self.on_apply_anno_to_next()
 
     # To visualize the image and annotation
     def _load_image(self, file: str, transfer=False):
-        color_mask = file.split(".")[0] + self.MASK_EXTENSION
-        # mask_png = file.split(".")[0] + self.MASK_EXTENSION_PNG
+        mask = file.split(".")[0] + self.MASK_EXTENSION
         labels = file.split(".")[0] + self.LABELS_EXTENSION
         image = cv2.imread(file, cv2.IMREAD_UNCHANGED)
         self.actual_shape = image.shape[:2][::-1]
@@ -202,12 +198,12 @@ class SettingsLayout(QWidget):
                            (int(self.parent().config.window_size[0]), self.parent().config.window_size[1]))
         self.parent().annotator.clear()
         self.parent().image_label.clear()
-        self.parent().set_image(image)
+        self.parent().set_image(image)  
         if transfer and self.current_annotation:
             self._apply_annotation(self.current_annotation)
             self.parent().info_label.setText("Transferred annotation to the next image!")
-        elif os.path.exists(color_mask) and os.path.exists(labels):
-            self._load_annotation(color_mask, labels)
+        elif os.path.exists(mask) and os.path.exists(labels):
+            self._load_annotation(mask, labels)
             self.parent().info_label.setText("Loaded annotation from saved files!")
             self.parent().update(self.parent().annotator.merge_image_visualization())
         else:
@@ -215,76 +211,41 @@ class SettingsLayout(QWidget):
          #   self.tag_text_field.setText("")
             self.parent().update(image)
 
+    # uAdded, ser input labels to json file
+    def on_save_labels(self):
+        path = os.path.split(self.actual_file)[0]
+        basename = os.path.splitext(os.path.basename(self.actual_file))[0]
+        labels_path = os.path.join(path, basename + self.LABELS_EXTENSION)
+        instances = self.label_text_field.text().split(",")
+        labels = {str(i): instance for i, instance in enumerate(instances)}
+        with open(labels_path, "w") as f:
+            json.dump(labels, f, indent=4)
+
     # # Load the annotation
-    # def _load_annotation(self, mask, labels):
-    #     mask = cv2.imread(mask, cv2.IMREAD_UNCHANGED)
-    #     mask = cv2.resize(mask, (self.config.window_size[0], self.config.window_size[1]),
-    #                       interpolation=cv2.INTER_NEAREST)
-    #     with open(labels, "r") as fp:
-    #         labels: dict[str, str] = json.load(fp)
-    #     masks_png = []
-    #     new_labels = []
-    #     if "instances" in labels:
-    #         instance_labels = labels["instances"]
-    #     else:
-    #         instance_labels = labels
-
-    #     if "tags" in labels:
-    #         self.tag_text_field.setText(",".join(labels["tags"]))
-    #     else:
-    #         self.tag_text_field.setText("")
-    #     for str_index, class_ in instance_labels.items():
-    #         single_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
-    #         single_mask[mask == int(str_index)] = 255
-    #         masks_png.append(single_mask)
-    #         new_labels.append(class_)
-    #     self.parent().annotator.masks = MasksAnnotation.from_masks(masks_png, new_labels)
-    #     self.current_annotation = (masks_png, new_labels)
-
     def _load_annotation(self, mask, labels):
-        # Load the mask image
         mask = cv2.imread(mask, cv2.IMREAD_UNCHANGED)
-        print(f"Loaded mask shape: {mask.shape}")
-
-        # Check the dimensions of the mask and ensure it's 2D
-        if len(mask.shape) == 3 and mask.shape[2] == 3:
-            # Convert to grayscale if it's a color image
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-            print("Converted mask to grayscale")
-
-        mask = cv2.resize(mask, (self.config.window_size[0], self.config.window_size[1]), interpolation=cv2.INTER_NEAREST)
-
+        mask = cv2.resize(mask, (self.config.window_size[0], self.config.window_size[1]),
+                          interpolation=cv2.INTER_NEAREST)
         with open(labels, "r") as fp:
             labels: dict[str, str] = json.load(fp)
-
         masks_png = []
         new_labels = []
-
-        # Get instance labels
         if "instances" in labels:
             instance_labels = labels["instances"]
         else:
             instance_labels = labels
 
-        # Get tags
         if "tags" in labels:
             self.tag_text_field.setText(",".join(labels["tags"]))
         else:
             self.tag_text_field.setText("")
-
-        # Create individual masks for each instance
         for str_index, class_ in instance_labels.items():
             single_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
-            single_mask[mask == int(str_index)] = 255  # Ensure this indexing matches the mask shape
+            single_mask[mask == int(str_index)] = 255
             masks_png.append(single_mask)
             new_labels.append(class_)
-
-        # Assign the masks and labels to the annotator
         self.parent().annotator.masks = MasksAnnotation.from_masks(masks_png, new_labels)
         self.current_annotation = (masks_png, new_labels)
-
-        print("Loaded annotation successfully")
-
 
     def on_show_image(self):
         pass
@@ -294,77 +255,23 @@ class SettingsLayout(QWidget):
 
     def on_precompute(self):
         pass
-
+       
     def on_save_mask(self):
-        # Define the colors for tags v1 and v2
-        tag_colors = {
-            "v1": (255, 0, 0),  # Red
-            "v2": (0, 255, 0)   # Green
-        }
-        
         path = os.path.split(self.actual_file)[0]
-        
         tags = self.tag_text_field.text().split(",")
         tags = [tag.strip() for tag in tags]
-        
         basename = os.path.splitext(os.path.basename(self.actual_file))[0]
-
         mask_path = os.path.join(path, basename + self.MASK_EXTENSION)
         labels_path = os.path.join(path, basename + self.LABELS_EXTENSION)
-
         masks = self.parent().get_mask()
 
-        # Assuming each file has only one tag, get the first tag
-        if len(tags) > 0:
-            tag = tags[0]
-        else:
-            tag = None
-        
-        # Modify the mask based on the tag
-        if tag in tag_colors:
-            color = tag_colors[tag]
-            colored_mask = self.apply_color_to_mask(masks, color)
-        else:
-            colored_mask = masks  # If no tag or unrecognized tag, leave mask as is
-
-        # Retrieve the labels and combine them with the tags
         labels = {"instances": self.parent().get_labels(), "tags": tags}
-        
-        # Save the labels (including tags) as a JSON file
         with open(labels_path, "w") as f:
             json.dump(labels, f, indent=4)
-        
-        # Resize the colored mask to the actual shape and save it as an image file
-        colored_mask = cv2.resize(colored_mask, self.actual_shape, interpolation=cv2.INTER_LINEAR)
-        cv2.imwrite(mask_path, colored_mask)
+        masks = cv2.resize(masks, self.actual_shape, interpolation=cv2.INTER_LINEAR)
+        cv2.imwrite(mask_path, masks)
 
-    def apply_color_to_mask(self, mask, color):
-        # Create an empty color mask
-        color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
-        
-        # Apply the specified color to the mask where the mask is not zero
-        color_mask[mask != 0] = color
-        
-        return color_mask
-
-
-            
-        # def on_save_mask(self):
-        #     path = os.path.split(self.actual_file)[0]
-        #     tags = self.tag_text_field.text().split(",")
-        #     tags = [tag.strip() for tag in tags]
-        #     basename = os.path.splitext(os.path.basename(self.actual_file))[0]
-        #     mask_path = os.path.join(path, basename + self.MASK_EXTENSION)
-        #     labels_path = os.path.join(path, basename + self.LABELS_EXTENSION)
-        #     masks = self.parent().get_mask()
-
-        #     labels = {"instances": self.parent().get_labels(), "tags": tags}
-        #     with open(labels_path, "w") as f:
-        #         json.dump(labels, f, indent=4)
-        #     masks = cv2.resize(masks, self.actual_shape, interpolation=cv2.INTER_LINEAR)
-        #     cv2.imwrite(mask_path, masks)
-
-        # Save the stack of png masks into one nrrd file to visualize in 3D, ex. in slicer
+    # Save the stack of png masks into one nrrd file to visualize in 3D, ex. in slicer
     def on_save_seg_stack(self):
         path = os.path.split(self.actual_file)[0]
         print(path)
