@@ -14,6 +14,7 @@ class MergeState(enum.Enum):
 
 
 class AnnotationLayout(QWidget):
+    LABELS_EXTENSION = "_labels.json"
 
     def __init__(self, parent, config) -> None:
         super().__init__(parent)
@@ -28,6 +29,9 @@ class AnnotationLayout(QWidget):
         self.add_box = QPushButton(f"Add Box [ {config.key_mapping.ADD_BOX.name} ]")
         self.annotate_all = QPushButton(f"Annotate All [ {config.key_mapping.ANNOTATE_ALL.name} ]")
         self.manual_polygon = QPushButton(f"Manual Polygon [ {config.key_mapping.MANUAL_POLYGON.name} ]")
+        self.labels_text_label = QLabel(self, text="Labels Text")
+        self.label_text_field = QLineEdit(self)
+        self.label_text_field.setPlaceholderText("Comma separated image labels")
         self.cancel_annotation = QPushButton(f"Cancel Annotation [ {config.key_mapping.CANCEL_ANNOTATION.name} ]")
         self.save_annotation = QPushButton(f"Save Annotation [ {config.key_mapping.SAVE_ANNOTATION.name} ]")
         self.pick_mask = QPushButton(f"Pick Mask [ {config.key_mapping.PICK_MASK.name} ]")
@@ -52,6 +56,9 @@ class AnnotationLayout(QWidget):
         self.partial_annotation.setShortcut(config.key_mapping.PARTIAL_ANNOTATION.key)
         self.delete_mask.setShortcut(config.key_mapping.DELETE_MASK.key)
         self.zoom_rectangle.setShortcut(config.key_mapping.ZOOM_RECTANGLE.key)
+
+        self.layout.addWidget(self.label_text_field)
+        self.layout.addWidget(self.labels_text_label)
 
         self.annotation_settings = CustomForm(self, AutomaticMaskGeneratorSettings())
         for w in [
@@ -102,12 +109,34 @@ class AnnotationLayout(QWidget):
         self.parent().annotator.pick_partial_mask()
         self.parent().image_label.clear()
 
-    @staticmethod
-    def _load_labels(config):
-        if not os.path.exists(config.label_file):  
+    def save_entered_labels(self, config):
+        # Get entered labels from the text field and split them by commas
+        entered_labels = self.label_text_field.text().split(",")
+        entered_labels = [label.strip() for label in entered_labels]
+
+        # Create a dictionary with labels as keys and iterated numbers as values
+        label_dict = {label: i + 1 for i, label in enumerate(entered_labels)}
+
+        # Load existing labels from the label file if it exists
+        existing_labels = {}
+        if os.path.exists(config.label_file):
+            with open(config.label_file, "r") as f:
+                existing_labels = json.load(f)
+
+        # Merge the existing labels with the new labels
+        merged_labels = {**existing_labels, **label_dict}
+
+        # Save the merged labels to the label file
+        with open(config.label_file, "w") as f:
+            json.dump(merged_labels, f, indent=4)
+
+    def _load_labels(self, config):
+        if not os.path.exists(config.label_file):
             return ["default"]
+        
         with open(config.label_file, "r") as f:
             labels = json.load(f)
+        
         MasksAnnotation.DEFAULT_LABEL = list(labels.keys())[0] if len(labels) > 0 else "default"
         return labels
 
@@ -200,3 +229,4 @@ class AnnotationLayout(QWidget):
         self.parent().annotator.save_mask(label=self.label_picker.currentItem().text())
         self.parent().update(self.parent().annotator.merge_image_visualization())
         self.parent().image_label.clear()
+        self.save_entered_labels(config=self.config)

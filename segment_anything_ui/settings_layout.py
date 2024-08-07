@@ -79,9 +79,6 @@ class SettingsLayout(QWidget):
         self.show_visualization.clicked.connect(self.on_show_visualization)
         self.show_text = QCheckBox("Show Text")
         self.show_text.clicked.connect(self.on_show_text)
-        self.labels_text_label = QLabel(self, text="Labels Text")
-        self.label_text_field = QLineEdit(self)
-        self.label_text_field.setPlaceholderText("Comma separated image labels")
         self.text_field_label = QLabel(self, text="Comma Separated Tags")
         self.tag_text_field = QLineEdit(self)
         self.tag_text_field.setPlaceholderText("Comma separated image tags")
@@ -93,9 +90,7 @@ class SettingsLayout(QWidget):
         self.layout.addWidget(self.save_mask)
         self.layout.addWidget(self.delete_existing_annotation)
         self.layout.addWidget(self.Save_Seg_Stack)
-        self.layout.addWidget(self.labels_text_label)
         self.layout.addWidget(self.show_text)
-        self.layout.addWidget(self.label_text_field)
         self.layout.addWidget(self.text_field_label)
         self.layout.addWidget(self.tag_text_field)
         self.layout.addWidget(self.checkpoint_path_label)
@@ -211,15 +206,6 @@ class SettingsLayout(QWidget):
          #   self.tag_text_field.setText("")
             self.parent().update(image)
 
-    # uAdded, ser input labels to json file
-    def on_save_labels(self):
-        path = os.path.split(self.actual_file)[0]
-        basename = os.path.splitext(os.path.basename(self.actual_file))[0]
-        labels_path = os.path.join(path, basename + self.LABELS_EXTENSION)
-        instances = self.label_text_field.text().split(",")
-        labels = {str(i): instance for i, instance in enumerate(instances)}
-        with open(labels_path, "w") as f:
-            json.dump(labels, f, indent=4)
 
     # # Load the annotation
     def _load_annotation(self, mask, labels):
@@ -257,6 +243,7 @@ class SettingsLayout(QWidget):
         pass
        
     def on_save_mask(self):
+
         path = os.path.split(self.actual_file)[0]
         tags = self.tag_text_field.text().split(",")
         tags = [tag.strip() for tag in tags]
