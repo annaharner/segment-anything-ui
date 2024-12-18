@@ -73,10 +73,10 @@ class SettingsLayout(QWidget):
         self.delete_existing_annotation.clicked.connect(self.on_delete_existing_annotation)
         self.Save_Seg_Stack = QPushButton("Save Segmentation Stack")
         self.Save_Seg_Stack.clicked.connect(self.on_save_seg_stack)
-        self.show_image = QPushButton("Show Image")
-        self.show_visualization = QPushButton("Show Visualization")
-        self.show_image.clicked.connect(self.on_show_image)
-        self.show_visualization.clicked.connect(self.on_show_visualization)
+#       self.show_image = QPushButton("Show Image")
+#       self.show_visualization = QPushButton("Show Visualization")
+#        self.show_image.clicked.connect(self.on_show_image)
+#        self.show_visualization.clicked.connect(self.on_show_visualization)
         self.show_text = QCheckBox("Show Text")
         self.show_text.clicked.connect(self.on_show_text)
         self.text_field_label = QLabel(self, text="Comma Separated Tags")
@@ -98,8 +98,8 @@ class SettingsLayout(QWidget):
         self.checkpoint_path.returnPressed.connect(self.on_checkpoint_path_changed)
         self.checkpoint_path.editingFinished.connect(self.on_checkpoint_path_changed)
         self.layout.addWidget(self.precompute_button)
-        self.layout.addWidget(self.show_image)
-        self.layout.addWidget(self.show_visualization)
+ #       self.layout.addWidget(self.show_image)
+ #       self.layout.addWidget(self.show_visualization)
         self.files = FilesHolder()
         self.neg_pnts = []
         self.pos_pnts = []
@@ -172,6 +172,7 @@ class SettingsLayout(QWidget):
     def on_previous_file(self):
         file = self.files.get_previous()
         self._load_image(file)
+        self.parent().setWindowTitle("Segment Anything UI - " + file)
         # Check if annotations should be propagated to the pervious image
         if self.apply_anno_to_next.isChecked():
             self.on_apply_anno_to_next()
@@ -208,14 +209,44 @@ class SettingsLayout(QWidget):
 
 
     # # Load the annotation
+    # def _load_annotation(self, mask, labels):
+    #     mask = cv2.imread(mask, cv2.IMREAD_UNCHANGED)
+    #     mask = cv2.resize(mask, (self.config.window_size[0], self.config.window_size[1]),
+    #                       interpolation=cv2.INTER_NEAREST)
+    #     with open(labels, "r") as fp:
+    #         labels: dict[str, str] = json.load(fp)
+    #         print(labels)
+    #     masks_png = []
+    #     new_labels = []
+    #     if "instances" in labels:
+    #         instance_labels = labels["instances"]
+    #     else:
+    #         instance_labels = labels
+
+    #     if "tags" in labels:
+    #         self.tag_text_field.setText(",".join(labels["tags"]))
+    #     else:
+    #         self.tag_text_field.setText("")
+    #     for str_index, class_ in instance_labels.items():
+    #         single_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
+    #         single_mask[mask == int(str_index)] = 255
+    #         masks_png.append(single_mask)
+    #         new_labels.append(class_)
+    #     self.parent().annotator.masks = MasksAnnotation.from_masks(masks_png, new_labels)
+    #     self.current_annotation = (masks_png, new_labels)
+
     def _load_annotation(self, mask, labels):
         mask = cv2.imread(mask, cv2.IMREAD_UNCHANGED)
         mask = cv2.resize(mask, (self.config.window_size[0], self.config.window_size[1]),
-                          interpolation=cv2.INTER_NEAREST)
+                        interpolation=cv2.INTER_NEAREST)
+        
         with open(labels, "r") as fp:
             labels: dict[str, str] = json.load(fp)
+            print(labels)
+
         masks_png = []
         new_labels = []
+
         if "instances" in labels:
             instance_labels = labels["instances"]
         else:
@@ -225,18 +256,31 @@ class SettingsLayout(QWidget):
             self.tag_text_field.setText(",".join(labels["tags"]))
         else:
             self.tag_text_field.setText("")
+
         for str_index, class_ in instance_labels.items():
             single_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
             single_mask[mask == int(str_index)] = 255
             masks_png.append(single_mask)
             new_labels.append(class_)
+
         self.parent().annotator.masks = MasksAnnotation.from_masks(masks_png, new_labels)
         self.current_annotation = (masks_png, new_labels)
+        
 
-    def on_show_image(self):
+    def _save_labels(self, labels, unique_labels):
+        # Update the labels dictionary with unique labels
+        labels["instances"] = {str(i): label for i, label in enumerate(unique_labels)}
+
+        # Save the updated labels back to a file
+        with open('updated_labels.json', 'w') as fp:  # Use a suitable file name
+            json.dump(labels, fp)
+
+
+
+ #   def on_show_image(self):
         pass
 
-    def on_show_visualization(self):
+ #   def on_show_visualization(self):
         pass
 
     def on_precompute(self):
@@ -268,13 +312,7 @@ class SettingsLayout(QWidget):
         reader = sitk.ImageSeriesReader()
         reader.SetFileNames(files)
         vol = reader.Execute()
-        Orientation_2 = sitk.PermuteAxes(vol, [2, 1, 0])
-        Orientation_3 = sitk.PermuteAxes(vol, [1, 0, 2])
-        Orientation_1 = sitk.PermuteAxes(vol, [0, 1, 2])
-        sitk.WriteImage(vol, 'seg_stack_Orient1.nrrd')
-        sitk.WriteImage(Orientation_2, 'seg_stack_Orient2.nrrd')
-        sitk.WriteImage(Orientation_3, 'seg_stack_Orient3.nrrd')
-        sitk.WriteImage(Orientation_1, 'seg_stack_Orient1.nrrd')
+        sitk.WriteImage(vol, 'seg_stack.nrrd')
 
     def on_checkpoint_path_changed(self):
         self.parent().sam = self.parent().init_sam()

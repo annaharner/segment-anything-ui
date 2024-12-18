@@ -12,6 +12,7 @@ from segment_anything_ui.model_builder import (
     get_predictor, get_mask_generator, EfficientViTSamPredictor, SamPredictor, EfficientViTSam)
 from skimage.measure import regionprops
 import torch
+import json
 
 from segment_anything_ui.utils.shapes import BoundingBox
 
@@ -100,18 +101,34 @@ class CustomForm(QWidget):
 
 class MasksAnnotation:
     DEFAULT_LABEL = "default"
+    with open('labels.json', 'r') as file:
+        data = json.load(file)
+
+        # Extract the keys and save them into a list
+    key_list = list(data.keys())
+
+    print(key_list)
 
     def __init__(self) -> None:
         self.masks = []
         self.label_map = {}
         self.mask_id: int = -1
 
+
+    # def add_mask(self, mask, label: str | None = None):
+    #     self.masks.append(mask)
+    #     self.label_map[len(self.masks)] = self.DEFAULT_LABEL if label is None else label # get the label from the labels.json file and just put them straight in here?
+    #     # or rewrite more so that the labels from albels.json are put in earlier
     def add_mask(self, mask, label: str | None = None):
+        # If no label is provided, fetch the selected label from label_picker
+        selected_label = self.parent.annotation_layout.label_picker.currentItem().text() if label is None else label
         self.masks.append(mask)
-        self.label_map[len(self.masks)] = self.DEFAULT_LABEL if label is None else label
+        print(selected_label)
+        self.label_map[len(self.masks)] = selected_label
+
 
     def add_label(self, mask_id: int, label: str):
-        self.label_map[mask_id] = label
+        self.label_map[mask_id] = self.label_picker(label)
 
     def get_mask(self, mask_id: int):
         return self.masks[mask_id]
@@ -184,6 +201,11 @@ class Annotator:
     def __post_init__(self):
         self.MAX_MASKS = 10
         self.cmap = get_cmap(self.MAX_MASKS)
+        if not hasattr(Annotator, '_label_colors'):
+            Annotator._label_colors = {}
+        # Initialize index for color assignment
+        if not hasattr(Annotator, '_next_color_index'):
+            Annotator._next_color_index = 0
 
     def set_image(self, image: np.ndarray):
         self.image = image
@@ -252,23 +274,53 @@ class Annotator:
         visualization = cv2.addWeighted(self.image.copy() if self.visualization is None else self.visualization.copy(),
                                         0.8, last_mask, 0.5, 0)
         self.parent.update(crop_image(visualization, self.zoomed_bounding_box))
-
+         
+    def get_color_for_label(self, label: str):
+        """Get or create a color for a given label"""
+        # Use the class-level color mapping
+        if label not in Annotator._label_colors:
+            # Generate color using HSV color space for better distinction
+            hue = (Annotator._next_color_index * 0.618033988749895) % 1.0  # Golden ratio for better distribution
+            color = plt.cm.hsv(hue)  # Convert to RGB
+            Annotator._label_colors[label] = color
+            Annotator._next_color_index += 1
+            
+            # If we're running out of colors, increase the colormap size
+            if Annotator._next_color_index >= self.MAX_MASKS:
+                self.MAX_MASKS += 10
+                self.cmap = get_cmap(self.MAX_MASKS)
+                
+        return Annotator._label_colors[label]
 
     def _visualize_mask(self) -> tuple:
         mask_argmax = self.make_instance_mask()
         visualization = np.zeros_like(self.image)
         border = np.zeros(self.image.shape[:2], dtype=np.uint8)
+        
+        # Check current label from label picker and ensure it has a color
+        current_label = self.parent.annotation_layout.label_picker.currentItem()
+        if current_label is not None:
+            label_text = current_label.text()
+            if label_text.strip():
+                # Pre-assign color for new labels
+                self.get_color_for_label(label_text)
+
         for i in range(1, np.amax(mask_argmax) + 1):
-            color = self.cmap(i)
+            label = self.masks.get_label(i)
+            # Get the persistent color for this label
+            color = self.get_color_for_label(label)
+            
             single_mask = np.zeros_like(mask_argmax)
             single_mask[mask_argmax == i] = 1
             visualization[mask_argmax == i, :] = np.array(color[:3]) * 255
             border += single_mask - cv2.erode(
-                single_mask, np.ones((3, 3), np.uint8), iterations=1)
-            label = self.masks.get_label(i)
+                single_mask, np.ones((3, 3), np.uint8), iterations=1
+            )
+            
             single_mask_center = np.mean(np.where(single_mask == 1), axis=1)
             if np.isnan(single_mask_center).any():
                 continue
+                
             if self.parent.settings.is_show_text():
                 cv2.putText(
                     visualization,
@@ -279,8 +331,48 @@ class Annotator:
                     [255, 255, 255],
                     1
                 )
+        
         border = (border == 0).astype(np.uint8)
         return visualization, border
+
+    @classmethod
+    def get_label_colors(cls):
+        """Get the current mapping of labels to colors"""
+        return cls._label_colors
+
+    @classmethod
+    def reset_colors(cls):
+        """Reset the color mapping (if needed)"""
+        cls._label_colors = {}
+        cls._next_color_index = 0
+
+    # def _visualize_mask(self) -> tuple:
+    #     mask_argmax = self.make_instance_mask()
+    #     visualization = np.zeros_like(self.image)
+    #     border = np.zeros(self.image.shape[:2], dtype=np.uint8)
+    #     for i in range(1, np.amax(mask_argmax) + 1):
+    #         color = self.cmap(i)
+    #         single_mask = np.zeros_like(mask_argmax)
+    #         single_mask[mask_argmax == i] = 1
+    #         visualization[mask_argmax == i, :] = np.array(color[:3]) * 255
+    #         border += single_mask - cv2.erode(
+    #             single_mask, np.ones((3, 3), np.uint8), iterations=1)
+    #         label = self.masks.get_label(i)
+    #         single_mask_center = np.mean(np.where(single_mask == 1), axis=1)
+    #         if np.isnan(single_mask_center).any():
+    #             continue
+    #         if self.parent.settings.is_show_text():
+    #             cv2.putText(
+    #                 visualization,
+    #                 label,
+    #                 (int(single_mask_center[1]), int(single_mask_center[0])),
+    #                 cv2.FONT_HERSHEY_PLAIN,
+    #                 0.5,
+    #                 [255, 255, 255],
+    #                 1
+    #             )
+    #     border = (border == 0).astype(np.uint8)
+    #     return visualization, border
 
     def has_annotations(self):
         return len(self.masks) > 0
