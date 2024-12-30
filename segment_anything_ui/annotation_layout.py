@@ -20,6 +20,7 @@ class AnnotationLayout(QWidget):
         super().__init__(parent)
         self.config = config
         self.zoom_flag = False
+        self.label_is_new = False
         self.merge_state = MergeState.PICKING
         self.layout = QVBoxLayout(self)
         labels = self._load_labels(config)
@@ -96,6 +97,9 @@ class AnnotationLayout(QWidget):
         self.partial_annotation.clicked.connect(self.on_partial_annotation)
         self.delete_mask.clicked.connect(self.on_delete_mask)
         self.zoom_rectangle.clicked.connect(self.on_zoom_rectangle)
+        
+        self.label_dict = {}
+        self.label_colors = {}
 
     def on_delete_mask(self):
         self.parent().info_label.setText("Deleting mask!")
@@ -110,9 +114,17 @@ class AnnotationLayout(QWidget):
         self.parent().image_label.clear()
 
     def save_entered_labels(self, config):
+        
         # Get entered labels from the text field and split them by commas
         entered_labels = self.label_text_field.text().split(",")
         entered_labels = [label.strip() for label in entered_labels]
+        # Add new labels to the label picker list
+        
+        self.label_is_new = False
+        for label in entered_labels:
+            if label not in self.label_dict:
+                self.label_picker.addItem(label)
+                self.label_is_new = True
 
         # Create a dictionary with labels as keys and iterated numbers as values
         label_dict = {label: i + 1 for i, label in enumerate(entered_labels)}
@@ -125,8 +137,18 @@ class AnnotationLayout(QWidget):
 
         # Merge the existing labels with the new labels
         merged_labels = {**existing_labels, **label_dict}
+        self.label_dict = merged_labels
 
         # Save the merged labels to the label file
+        current_item = entered_labels[0] # self.label_picker.currentItem().text() #if self.label_picker.currentItem() else self.label_text_field.text().split(",")[0].strip()
+        self.label_picker.clear()
+        self.label_picker.addItems(merged_labels.keys())
+        if current_item:
+            items = self.label_picker.findItems(current_item, Qt.MatchExactly)
+            if items:
+                self.label_picker.setCurrentItem(items[0])
+                print("Setting current item to ", current_item)
+            
         with open(config.label_file, "w") as f:
             json.dump(merged_labels, f, indent=4)
 
@@ -226,9 +248,14 @@ class AnnotationLayout(QWidget):
         if self.parent().image_label.paint_type == PaintType.POLYGON:
             self.parent().annotator.last_mask = self.parent().image_label.polygon.to_mask(
                 self.config.window_size[0], self.config.window_size[1])
-        self.parent().annotator.save_mask()
+        # Get the currently selected label
+        label = self.label_picker.currentItem().text()
+        # Unless a new label was entered in the text box
+        if not label or label == "":
+            label = self.label_text_field.text()
+        self.parent().annotator.save_mask(label=label)
+        self.save_entered_labels(config=self.config)
         self.parent().update(self.parent().annotator.merge_image_visualization())
         self.parent().image_label.clear()
-        self.save_entered_labels(config=self.config)
 
 

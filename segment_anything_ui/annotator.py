@@ -104,11 +104,6 @@ class MasksAnnotation:
     with open('labels.json', 'r') as file:
         data = json.load(file)
 
-        # Extract the keys and save them into a list
-    key_list = list(data.keys())
-
-    print(key_list)
-
     def __init__(self) -> None:
         self.masks = []
         self.label_map = {}
@@ -278,37 +273,55 @@ class Annotator:
     def get_color_for_label(self, label: str):
         """Get or create a color for a given label"""
         # Use the class-level color mapping
-        if label not in Annotator._label_colors:
-            # Generate color using HSV color space for better distinction
-            hue = (Annotator._next_color_index * 0.618033988749895) % 1.0  # Golden ratio for better distribution
-            color = plt.cm.hsv(hue)  # Convert to RGB
-            Annotator._label_colors[label] = color
-            Annotator._next_color_index += 1
-            
-            # If we're running out of colors, increase the colormap size
-            if Annotator._next_color_index >= self.MAX_MASKS:
-                self.MAX_MASKS += 10
-                self.cmap = get_cmap(self.MAX_MASKS)
+        #if label not in Annotator._label_colors:
+        # Generate color using HSV color space for better distinction
+        hue = (Annotator._next_color_index * 0.618033988749895) % 1.0  # Golden ratio for better distribution
+        color = plt.cm.hsv(hue)  # Convert to RGB
+        Annotator._label_colors[label] = color
+        Annotator._next_color_index += 1
+        
+        # If we're running out of colors, increase the colormap size
+        if Annotator._next_color_index >= self.MAX_MASKS:
+            self.MAX_MASKS += 10
+            self.cmap = get_cmap(self.MAX_MASKS)
                 
         return Annotator._label_colors[label]
 
     def _visualize_mask(self) -> tuple:
+        print("VISUALIZING MASK")
+        # Check current label from label picker and ensure it has a color
+        current_label = self.parent.annotation_layout.label_picker.currentItem()
+        print("current label",current_label)
+        if current_label is not None:
+            label_text = current_label.text()
+            if label_text.strip():
+                # Check if the label exists in label_dict
+                if self.parent.annotation_layout.label_is_new:
+                    # Create a new color and assign it to the label
+                    color = self.get_color_for_label(label_text)
+                    print(f"NEW COLOR: {color}")
+                    self.parent.annotation_layout.label_colors[label_text] = color
+                else:
+                    # Use the existing color from label_dict
+                    color = self.parent.annotation_layout.label_colors[label_text]
+                    print(color)
+
+                print(f"LABEL DICT: {self.parent.annotation_layout.label_dict}")
+                print(f"LABEL DICT: {self.parent.annotation_layout.label_colors}")
+        
+        # current_item = self.parent.annotation_layout.label_picker.currentItem()
+        # if current_item is not None and current_item.text() == label_text:
+        #     self.parent.annotation_layout.label_picker.setCurrentItem(None)
+        # Save the current label as the previous label after processing
         mask_argmax = self.make_instance_mask()
         visualization = np.zeros_like(self.image)
         border = np.zeros(self.image.shape[:2], dtype=np.uint8)
         
-        # Check current label from label picker and ensure it has a color
-        current_label = self.parent.annotation_layout.label_picker.currentItem()
-        if current_label is not None:
-            label_text = current_label.text()
-            if label_text.strip():
-                # Pre-assign color for new labels
-                self.get_color_for_label(label_text)
-
         for i in range(1, np.amax(mask_argmax) + 1):
             label = self.masks.get_label(i)
             # Get the persistent color for this label
-            color = self.get_color_for_label(label)
+        #    color = self.get_color_for_label(label)
+            print(color)
             
             single_mask = np.zeros_like(mask_argmax)
             single_mask[mask_argmax == i] = 1
