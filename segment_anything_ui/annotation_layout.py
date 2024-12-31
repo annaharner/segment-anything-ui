@@ -41,7 +41,7 @@ class AnnotationLayout(QWidget):
         self.partial_annotation = QPushButton(f"Partial Annotation [ {config.key_mapping.PARTIAL_ANNOTATION.name} ]")
         self.zoom_rectangle = QPushButton(f"Zoom Rectangle [ {config.key_mapping.ZOOM_RECTANGLE.name} ]")
         self.label_picker = QListWidget()
-        self.label_picker.addItems(labels)
+        self.label_picker.addItems(labels.keys())
         self.label_picker.setCurrentRow(0)
         self.move_current_mask_background = QPushButton("Move Current Mask to Front")
         self.remove_hidden_masks = QPushButton("Remove Hidden Masks")
@@ -133,10 +133,11 @@ class AnnotationLayout(QWidget):
         existing_labels = {}
         if os.path.exists(config.label_file):
             with open(config.label_file, "r") as f:
-                existing_labels = json.load(f)
+                existing_labels = json.load(f) 
 
         # Merge the existing labels with the new labels
-        merged_labels = {**existing_labels, **label_dict}
+        # merged_labels = {**existing_labels, **label_dict}
+        merged_labels = existing_labels # TEMP: Don't merge labels
         self.label_dict = merged_labels
 
         # Save the merged labels to the label file
@@ -148,9 +149,10 @@ class AnnotationLayout(QWidget):
             if items:
                 self.label_picker.setCurrentItem(items[0])
                 print("Setting current item to ", current_item)
-            
-        with open(config.label_file, "w") as f:
-            json.dump(merged_labels, f, indent=4)
+
+        # TEMP: don't overwrite labels            
+        # with open(config.label_file, "w") as f:
+        #     json.dump(merged_labels, f, indent=4)
 
     def _load_labels(self, config):
         if not os.path.exists(config.label_file):
@@ -249,10 +251,10 @@ class AnnotationLayout(QWidget):
             self.parent().annotator.last_mask = self.parent().image_label.polygon.to_mask(
                 self.config.window_size[0], self.config.window_size[1])
         # Get the currently selected label
-        label = self.label_picker.currentItem().text()
+        # label = self.label_picker.currentItem().text()
         # Unless a new label was entered in the text box
-        if not label or label == "":
-            label = self.label_text_field.text()
+        #if not label or label == "":
+        label = self.label_text_field.text()
         self.parent().annotator.save_mask(label=label)
         self.save_entered_labels(config=self.config)
         self.parent().update(self.parent().annotator.merge_image_visualization())

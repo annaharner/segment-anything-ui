@@ -293,8 +293,30 @@ class SettingsLayout(QWidget):
         basename = os.path.splitext(os.path.basename(self.actual_file))[0]
         mask_path = os.path.join(path, basename + self.MASK_EXTENSION)
         labels_path = os.path.join(path, basename + self.LABELS_EXTENSION)
-        masks = self.parent().get_mask()
-        labels = {"instances": self.parent().get_labels(), "tags": tags}
+        # SOREN: I don't think this is really what we want.
+        # This stacks masks along dimension 0 and then does the argmax to see which mask has the highest value at each pixel.
+        # And this index value (essentially the "channel") is what gets used as the final mask. For now, I'm going to assume
+        # a single class per image and multiply the resulting mask by the class label to get the final mask.
+        labels = self.parent().get_labels()
+        label = list(labels.items())[0][1] # For now we assume a single class per image
+        existing_labels = {}
+        main_labels_file = 'labels.json'
+        if os.path.exists(main_labels_file):
+            with open(main_labels_file, "r") as f:
+                existing_labels = json.load(f)
+        label_class_id = existing_labels.get(label, 1)
+        masks = self.parent().get_mask().astype(np.uint8)
+        arr = masks.reshape(-1)
+        print('background', sum(arr == 0))
+        print('class1', sum(arr == 1))
+        print('class2', sum(arr == 2))
+        masks = masks * label_class_id
+        arr = masks.reshape(-1)
+        print('background', sum(arr == 0))
+        print('class1', sum(arr == 1))
+        print('class2', sum(arr == 2))
+        
+        labels = {"instances": labels, "tags": tags}
         with open(labels_path, "w") as f:
             json.dump(labels, f, indent=4)
         masks = cv2.resize(masks, self.actual_shape, interpolation=cv2.INTER_LINEAR)

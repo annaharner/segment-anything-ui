@@ -101,8 +101,6 @@ class CustomForm(QWidget):
 
 class MasksAnnotation:
     DEFAULT_LABEL = "default"
-    with open('labels.json', 'r') as file:
-        data = json.load(file)
 
     def __init__(self) -> None:
         self.masks = []
@@ -277,6 +275,11 @@ class Annotator:
         # Generate color using HSV color space for better distinction
         hue = (Annotator._next_color_index * 0.618033988749895) % 1.0  # Golden ratio for better distribution
         color = plt.cm.hsv(hue)  # Convert to RGB
+        if label == 'V1':
+            color = (0, 0, 1, 1)
+        else:
+            color = (1, 0, 0, 1)
+        
         Annotator._label_colors[label] = color
         Annotator._next_color_index += 1
         
@@ -296,7 +299,8 @@ class Annotator:
             label_text = current_label.text()
             if label_text.strip():
                 # Check if the label exists in label_dict
-                if self.parent.annotation_layout.label_is_new:
+                # TEMPORARY FIX: Check if the label is new or not
+                if self.parent.annotation_layout.label_is_new or label_text not in self.parent.annotation_layout.label_colors:
                     # Create a new color and assign it to the label
                     color = self.get_color_for_label(label_text)
                     print(f"NEW COLOR: {color}")
@@ -320,8 +324,7 @@ class Annotator:
         for i in range(1, np.amax(mask_argmax) + 1):
             label = self.masks.get_label(i)
             # Get the persistent color for this label
-        #    color = self.get_color_for_label(label)
-            print(color)
+            color = self.get_color_for_label(label)
             
             single_mask = np.zeros_like(mask_argmax)
             single_mask[mask_argmax == i] = 1
